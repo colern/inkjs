@@ -1,8 +1,8 @@
-# InkJS
+﻿# InkJS
 
 
 InkJS is a JavaScript library supported ink canvas which like microsoft inkcanvas. It inherited from signature_pad but support more features, applied with stabilizer(https://github.com/opentoonz/opentoonz/issues/81).
-If you use firefox, you could open about:config and set dom.w3c_pointer_events.enabled preference to true.
+If you use firefox, you could open `about:config` and set `dom.w3c_pointer_events.enabled` preference to `true`.
 So if you hope to use a light weight library or compatibility for older browser, I addvise you use signature_pad.
 
 ## Usage
@@ -11,21 +11,6 @@ So if you hope to use a light weight library or compatibility for older browser,
 var canvas = document.querySelector("canvas");
 
 var inkCanvas = new InkCanvas(canvas);
-
-// Returns signature image as data URL
-inkCanvas.toDataURL(); // save image as PNG
-inkCanvas.toDataURL("image/jpeg"); // save image as JPEG
-inkCanvas.toDataURL("image/svg+xml"); // save image as SVG
-
-// Draws signature image from data URL.
-// NOTE: This method does not populate internal data structure that represents drawn signature. Thus, after using #fromDataURL, #toData won't work properly.
-inkCanvas.fromDataURL("data:image/png;base64,iVBORw0K...");
-
-// Returns signature image as an array of point groups
-const data = inkCanvas.toData();
-
-// Draws signature image from an array of point groups
-inkCanvas.fromData(data);
 
 // Clears the canvas
 inkCanvas.clear();

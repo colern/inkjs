@@ -15,7 +15,6 @@ function Curve(id, color) {
 
 Curve.createFragment = function (data, index) {
     let len = data.length - index;
-
     if (len >= 2) {
         let pt1 = data[index],
             pt2 = null,
@@ -129,17 +128,43 @@ Curve.prototype.draw = function (context) {
     if (this.hide == true) return;
     let fst = context.fillStyle;
     context.fillStyle = this.color;
-    for (let idx = 1; idx < this._smoothData.length; ++idx) {
-        const frag = Curve.createFragment(this._smoothData, idx);
-        if (frag) {
-            const widths = Curve.calculateFragmentWidths(frag, this.radiu);
-            if (widths) {
-                Curve.drawFragment(context, frag, widths.start, widths.end);
-            }
+    //draw first 3 points
+    for (let st = 0; st < 4; ++st) {
+        let arr = [];
+        if (st == 0) {
+            arr.push(this._smoothData[0]);
         }
+        if (st == 1) {
+            arr.push(this._smoothData[0]);
+            arr.push(this._smoothData[1]);
+        }
+        if (st == 2) {
+            arr.push(this._smoothData[0]);
+            arr.push(this._smoothData[1]);
+            arr.push(this._smoothData[2]);
+        }
+        if (st == 3) {
+            arr.push(this._smoothData[st - 3]);
+            arr.push(this._smoothData[st - 2]);
+            arr.push(this._smoothData[st - 1]);
+            arr.push(this._smoothData[st]);
+        }
+        this._drawFrag(context,arr, 0);
+    }
+    for (let idx = 0; idx < this._smoothData.length; ++idx) {
+        this._drawFrag(context,this._smoothData, idx);
     }
     context.fillStyle = fst;
 }
 
+Curve.prototype._drawFrag = function (context,data, pos) {
+    const frag = Curve.createFragment(data, pos);
+    if (frag) {
+        const widths = Curve.calculateFragmentWidths(frag, this.radiu);
+        if (widths) {
+            Curve.drawFragment(context, frag, widths.start, widths.end);
+        }
+    }
+}
 
 export default Curve;

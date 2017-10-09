@@ -216,7 +216,6 @@ function Curve(id, color) {
 
 Curve.createFragment = function (data, index) {
     var len = data.length - index;
-
     if (len >= 2) {
         var pt1 = data[index],
             pt2 = null,
@@ -328,16 +327,43 @@ Curve.prototype.draw = function (context) {
     if (this.hide == true) return;
     var fst = context.fillStyle;
     context.fillStyle = this.color;
-    for (var idx = 1; idx < this._smoothData.length; ++idx) {
-        var frag = Curve.createFragment(this._smoothData, idx);
-        if (frag) {
-            var widths = Curve.calculateFragmentWidths(frag, this.radiu);
-            if (widths) {
-                Curve.drawFragment(context, frag, widths.start, widths.end);
-            }
+    //draw first 3 points
+    for (var st = 0; st < 4; ++st) {
+        var arr = [];
+        if (st == 0) {
+            arr.push(this._smoothData[0]);
         }
+        if (st == 1) {
+            arr.push(this._smoothData[0]);
+            arr.push(this._smoothData[1]);
+        }
+        if (st == 2) {
+            arr.push(this._smoothData[0]);
+            arr.push(this._smoothData[1]);
+            arr.push(this._smoothData[2]);
+        }
+        if (st == 3) {
+            arr.push(this._smoothData[st - 3]);
+            arr.push(this._smoothData[st - 2]);
+            arr.push(this._smoothData[st - 1]);
+            arr.push(this._smoothData[st]);
+        }
+        this._drawFrag(context, arr, 0);
+    }
+    for (var idx = 0; idx < this._smoothData.length; ++idx) {
+        this._drawFrag(context, this._smoothData, idx);
     }
     context.fillStyle = fst;
+};
+
+Curve.prototype._drawFrag = function (context, data, pos) {
+    var frag = Curve.createFragment(data, pos);
+    if (frag) {
+        var widths = Curve.calculateFragmentWidths(frag, this.radiu);
+        if (widths) {
+            Curve.drawFragment(context, frag, widths.start, widths.end);
+        }
+    }
 };
 
 function InkCanvas(canvas, options) {
@@ -501,10 +527,15 @@ InkCanvas.prototype.hitTest = function (pt) {
         //const curve = checkCurves[i].data;
         var curve = checkCurves[_i];
         var data = curve._smoothData;
-        console.info('in box: ' + curve.id);
+        //for (let ii = 0; ii < data.length; ++ii) {
+        //    const pt1 = data[ii];
+        //    ctx.moveTo(pt1.x, pt1.y);
+        //    ctx.arc(pt1.x, pt1.y, 2, 0, Math.PI * 2, false);
+        //}
         for (var idx = 0; idx < data.length - 1; ++idx) {
             var pt1 = data[idx];
             var pt2 = data[idx + 1];
+
             var bbox = new BBox(pt1, pt2);
             //ctx.moveTo(bbox.left, bbox.top);
             //ctx.lineTo(bbox.right, bbox.top);
@@ -517,7 +548,7 @@ InkCanvas.prototype.hitTest = function (pt) {
                     if (bbox.slopeWith(pt.x, pt.y)) {
                         hitIds.push(curve);
                     }
-                    console.info('in bound: ' + curve.id);
+                    //console.info('in bound: ' + curve.id);
                 }
             } else {
                 if (bbox.isIntersect(new BBox(this._lastPoint, pt))) {
@@ -526,6 +557,7 @@ InkCanvas.prototype.hitTest = function (pt) {
                     if (first * second < 0 || Math.abs(first) < 0.3 || Math.abs(second) < 0.3) {
                         hitIds.push(curve);
                     }
+                    //console.info('intersect:' + curve.id);
                 }
             }
             bbox = null;
@@ -533,6 +565,7 @@ InkCanvas.prototype.hitTest = function (pt) {
         //let endPt = data[data.length - 1];
         //ctx.fillText(endPt.x + ',' + endPt.y, endPt.x+2, endPt.y+2);
     }
+    //ctx.stroke();
     //ctx.closePath();
     //ctx.strokeStyle = 'black';
     this._lastPoint = pt;
@@ -578,9 +611,6 @@ InkCanvas.prototype._strokeUpdate = function (event) {
     var point = this._event2Point(event);
     switch (this.state) {
         case 'pen':
-            var lastPointGroup = this._data[this._data.length - 1];
-            var lastPoint = lastPointGroup && lastPointGroup.get(lastPointGroup.length - 1);
-            var isLastPointTooClose = lastPoint && point.distanceTo(lastPoint) < this.minDistance;
             this._drawAddedPoint(point);
             break;
         case 'eraser':
@@ -614,7 +644,6 @@ InkCanvas.prototype._strokeEnd = function (event) {
         var curPoint = this._event2Point(event);
         curPoint.pressure = 0.005;
         this._drawAddedPoint(curPoint);
-        //console.info('strokeEnd: (' + curPoint.x + ',' + curPoint.y + ')');
         this._drawLastPoints();
     }
 
@@ -707,10 +736,25 @@ InkCanvas.prototype._drawLastPoints = function () {
     if (curve) {
         this._calculateWidthAndDraw(curve);
         //draw last 2 points
-        curve = this._caculateCurve(this.smoothGroup);
-        this._calculateWidthAndDraw(curve);
+        this._drawEndCurve();
         var p = this.smoothGroup[this.smoothGroup.length - 1];
         this.smoothGroup.push(p);
+        this._drawEndCurve();
+        //let ctx = this._ctx;
+        //let old = ctx.fillStyle;
+        //ctx.fillStyle = 'green';
+        //ctx.beginPath();
+        //ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        //ctx.stroke();
+        //ctx.closePath();
+        //ctx.fillStyle = old;
+    }
+};
+
+InkCanvas.prototype._drawEndCurve = function () {
+    var curve = this._caculateCurve(this.smoothGroup);
+    if (curve) {
+        this._calculateWidthAndDraw(curve);
     }
 };
 
