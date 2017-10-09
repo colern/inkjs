@@ -156,15 +156,30 @@ BBox.prototype.isInBound = function (x, y) {
 };
 
 BBox.prototype.slopeWith = function (x, y) {
+    var d = Math.abs(this.slope(x, y));
+    //console.info(d);
+    if (d < 0.3) return true;
+    return false;
+};
+
+BBox.prototype.slope = function (x, y) {
     var dx = this.p2.x - this.p1.x;
     var dy = this.p2.y - this.p1.y;
     var px = x - this.p1.x;
     var py = y - this.p1.y;
     var tx = px / dx;
     var ty = py / dy;
-    var d = Math.abs(tx - ty);
-    //console.info(d);
-    if (d < 0.3) return true;
+    return tx - ty;
+};
+
+BBox.prototype.isIntersect = function (box) {
+    var xLeft = Math.max(this.left, box.left);
+    var xRight = Math.min(this.right, box.right);
+    var yTop = Math.max(this.top, box.top);
+    var yBottom = Math.min(this.bottom, box.bottom);
+    if (xLeft - xRight < 0 && yTop - yBottom < 0) {
+        return true;
+    }
     return false;
 };
 
@@ -355,6 +370,7 @@ function InkCanvas(canvas, options) {
     this.onBegin = opts.onBegin;
     this.onEnd = opts.onEnd;
 
+    this._lastPoint = null; //captured point in last time
     this._canvas = canvas;
     this._ctx = canvas.getContext('2d');
     this.clear();
@@ -469,11 +485,11 @@ InkCanvas.prototype.isEmpty = function () {
     return this._isEmpty;
 };
 
-InkCanvas.prototype.hitTest = function (x, y) {
+InkCanvas.prototype.hitTest = function (pt) {
     var len = this._data.length;
     var checkCurves = [];
     for (var i = 0; i < len; ++i) {
-        if (this._data[i].isIn(x, y)) {
+        if (this._data[i].isIn(pt.x, pt.y)) {
             checkCurves.push(this._data[i]);
         }
     }
@@ -485,6 +501,7 @@ InkCanvas.prototype.hitTest = function (x, y) {
         //const curve = checkCurves[i].data;
         var curve = checkCurves[_i];
         var data = curve._smoothData;
+        console.info('in box: ' + curve.id);
         for (var idx = 0; idx < data.length - 1; ++idx) {
             var pt1 = data[idx];
             var pt2 = data[idx + 1];
@@ -495,8 +512,21 @@ InkCanvas.prototype.hitTest = function (x, y) {
             //ctx.lineTo(bbox.left, bbox.bottom);
             //ctx.lineTo(bbox.left, bbox.top);
             //ctx.stroke();
-            if (bbox.isInBound(x, y) && bbox.slopeWith(x, y)) {
-                hitIds.push(curve);
+            if (this._lastPoint == null) {
+                if (bbox.isInBound(pt.x, pt.y)) {
+                    if (bbox.slopeWith(pt.x, pt.y)) {
+                        hitIds.push(curve);
+                    }
+                    console.info('in bound: ' + curve.id);
+                }
+            } else {
+                if (bbox.isIntersect(new BBox(this._lastPoint, pt))) {
+                    var first = bbox.slope(this._lastPoint.x, this._lastPoint.y);
+                    var second = bbox.slope(pt.x, pt.y);
+                    if (first * second < 0 || Math.abs(first) < 0.3 || Math.abs(second) < 0.3) {
+                        hitIds.push(curve);
+                    }
+                }
             }
             bbox = null;
         }
@@ -505,6 +535,7 @@ InkCanvas.prototype.hitTest = function (x, y) {
     }
     //ctx.closePath();
     //ctx.strokeStyle = 'black';
+    this._lastPoint = pt;
     if (hitIds.length > 0) return hitIds;
     return null;
 };
@@ -553,7 +584,8 @@ InkCanvas.prototype._strokeUpdate = function (event) {
             this._drawAddedPoint(point);
             break;
         case 'eraser':
-            var hits = this.hitTest(point.x, point.y);
+            //may be too fast to close the curve.
+            var hits = this.hitTest(point);
             if (hits != null) {
                 for (var i = 0; i < hits.length; ++i) {
                     hits[i].hide = true;
@@ -564,7 +596,7 @@ InkCanvas.prototype._strokeUpdate = function (event) {
 
             break;
         default:
-            if (this.hitTest(point.x, point.y)) {
+            if (this.hitTest(point)) {
                 console.info('hit');
             }
             break;
@@ -685,6 +717,7 @@ InkCanvas.prototype._drawLastPoints = function () {
 InkCanvas.prototype._reset = function () {
     this.points = [];
     this.smoothGroup = [];
+    this._lastPoint = null;
     this._lastVelocity = 0;
     this._lastWidth = this.radiu;
     this._ctx.fillStyle = this.penColor;

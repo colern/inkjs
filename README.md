@@ -2,7 +2,7 @@
 
 
 InkJS is a JavaScript library supported ink canvas which like microsoft inkcanvas. It inherited from signature_pad but support more features, applied with stabilizer(https://github.com/opentoonz/opentoonz/issues/81).
-It works base pointer event api which firefox and some browsers has not supported now.
+If you use firefox, you could open about:config and set dom.w3c_pointer_events.enabled preference to true.
 So if you hope to use a light weight library or compatibility for older browser, I addvise you use signature_pad.
 
 ## Usage
