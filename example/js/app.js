@@ -1,9 +1,10 @@
 ﻿var wrapper = document.getElementById("signature-pad");
 var clearButton = wrapper.querySelector("[data-action=clear]");
-var savePNGButton = wrapper.querySelector("[data-action=save-png]");
-var saveSVGButton = wrapper.querySelector("[data-action=save-svg]");
+//var savePNGButton = wrapper.querySelector("[data-action=save-png]");
+//var saveSVGButton = wrapper.querySelector("[data-action=save-svg]");
 var eraserButton = wrapper.querySelector("[data-action=eraser]");
 var penButton = wrapper.querySelector("[data-action=pen]");
+var selButton = wrapper.querySelector("[data-action=select]");
 var canvas = wrapper.querySelector("canvas");
 var inkCanvas = new InkCanvas(canvas,{radiu:2.0});
 
@@ -70,27 +71,30 @@ clearButton.addEventListener("click", function (event) {
   inkCanvas.clear();
 });
 
-savePNGButton.addEventListener("click", function (event) {
-  if (inkCanvas.isEmpty()) {
-    alert("Please provide a signature first.");
-  } else {
-    var dataURL = inkCanvas.toDataURL();
-    download(dataURL, "signature.png");
-  }
-});
+//savePNGButton.addEventListener("click", function (event) {
+//  if (inkCanvas.isEmpty()) {
+//    alert("Please provide a signature first.");
+//  } else {
+//    var dataURL = inkCanvas.toDataURL();
+//    download(dataURL, "signature.png");
+//  }
+//});
 
-saveSVGButton.addEventListener("click", function (event) {
-  if (inkCanvas.isEmpty()) {
-    alert("Please provide a signature first.");
-  } else {
-    var dataURL = inkCanvas.toDataURL('image/svg+xml');
-    download(dataURL, "signature.svg");
-  }
-});
+//saveSVGButton.addEventListener("click", function (event) {
+//  if (inkCanvas.isEmpty()) {
+//    alert("Please provide a signature first.");
+//  } else {
+//    var dataURL = inkCanvas.toDataURL('image/svg+xml');
+//    download(dataURL, "signature.svg");
+//  }
+//});
 
 eraserButton.addEventListener("click", function (event) {
     inkCanvas.setState('eraser');
 });
 penButton.addEventListener("click", function (event) {
     inkCanvas.setState('pen');
+});
+selButton.addEventListener("click", function (event) {
+    inkCanvas.setState('select');
 });

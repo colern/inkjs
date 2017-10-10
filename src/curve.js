@@ -61,7 +61,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
     const widthDelta = endWidth - startWidth;
     const drawSteps = Math.floor(fragment.length());
     context.beginPath();
-
+    if (drawSteps == 0) {
+        console.info('000');
+    }
     for (let i = 0; i < drawSteps; i += 1) {
         // Calculate the Bezier (x, y) coordinate for this step.
         const t = i / drawSteps;
@@ -82,6 +84,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
         y += ttt * fragment.endPoint.y;
 
         const width = startWidth + (ttt * widthDelta);
+        if (width <= 0.3) {
+            console.info('----');
+        }
         Curve.drawPoint(context,x, y, width);
     }
 

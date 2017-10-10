@@ -1,8 +1,8 @@
 /*!
- * Signature Pad v2.3.0
- * https://github.com/szimek/signature_pad
+ * Signature Pad v0.0.1
+ * https://github.com/colern/inkjs
  *
- * Copyright 2017 Szymon Nowak
+ * Copyright 2017 Szymon Nowak, Webberg
  * Released under the MIT license
  *
  * The main idea and some parts of the code (e.g. drawing variable width Bézier curve) are taken from:
@@ -260,7 +260,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
     var widthDelta = endWidth - startWidth;
     var drawSteps = Math.floor(fragment.length());
     context.beginPath();
-
+    if (drawSteps == 0) {
+        console.info('000');
+    }
     for (var i = 0; i < drawSteps; i += 1) {
         // Calculate the Bezier (x, y) coordinate for this step.
         var t = i / drawSteps;
@@ -281,6 +283,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
         y += ttt * fragment.endPoint.y;
 
         var width = startWidth + ttt * widthDelta;
+        if (width <= 0.3) {
+            console.info('----');
+        }
         Curve.drawPoint(context, x, y, width);
     }
 
@@ -397,6 +402,7 @@ function InkCanvas(canvas, options) {
     this.onEnd = opts.onEnd;
 
     this._lastPoint = null; //captured point in last time
+    this._selectIds = [];
     this._canvas = canvas;
     this._ctx = canvas.getContext('2d');
     this.clear();
@@ -421,6 +427,9 @@ function InkCanvas(canvas, options) {
         if (event.which === 1 && self._mouseButtonDown) {
             self._mouseButtonDown = false;
             self._strokeEnd(event);
+            if (self.state === 'select') {
+                self.redraw();
+            }
         }
     };
 
@@ -574,6 +583,7 @@ InkCanvas.prototype.hitTest = function (pt) {
 };
 
 InkCanvas.prototype.redraw = function () {
+    this._clearBackground();
     this.drawCurves(this._data);
 };
 
@@ -620,14 +630,18 @@ InkCanvas.prototype._strokeUpdate = function (event) {
                 for (var i = 0; i < hits.length; ++i) {
                     hits[i].hide = true;
                 }
-                this._clearBackground();
                 this.redraw();
             }
-
+            break;
+        case 'select':
+            if (this._selectIds.length == 0) {
+                console.info('ddd');
+                this._drawRing(point);
+            } else {}
             break;
         default:
             if (this.hitTest(point)) {
-                console.info('hit');
+                //console.info('hit');
             }
             break;
     }
@@ -728,26 +742,37 @@ InkCanvas.prototype._calculateWidthAndDraw = function (curve) {
     var widths = Curve.calculateFragmentWidths(curve, this.radiu);
     if (widths) {
         Curve.drawFragment(this._ctx, curve, widths.start, widths.end);
+    } else {
+        console.info('width');
     }
 };
-
 InkCanvas.prototype._drawLastPoints = function () {
     var curve = this._addPoint();
     if (curve) {
         this._calculateWidthAndDraw(curve);
-        //draw last 2 points
-        this._drawEndCurve();
-        var p = this.smoothGroup[this.smoothGroup.length - 1];
-        this.smoothGroup.push(p);
-        this._drawEndCurve();
+        //const pp = curve.endPoint;
+        //const p2 = this.smoothGroup[this.smoothGroup.length - 2];
         //let ctx = this._ctx;
+        //ctx.strokeStyle = 'green';
+        //ctx.beginPath();
+        //ctx.arc(pp.x, pp.y, 4, 0, Math.PI * 2);
+        //ctx.arc(p2.x, p2.y, 4, 0, Math.PI * 2);
+        //ctx.stroke();
+        //ctx.closePath();
+        //draw last 2 points
+        //this._drawEndCurve();
+        //print(this.smoothGroup);
+        //const p = this.smoothGroup[this.smoothGroup.length - 1];
+        //this.smoothGroup.push(p);
+        this._drawEndCurve();
+        //print(this.smoothGroup);
         //let old = ctx.fillStyle;
-        //ctx.fillStyle = 'green';
         //ctx.beginPath();
         //ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
         //ctx.stroke();
         //ctx.closePath();
         //ctx.fillStyle = old;
+        //this._drawEndCurve();
     }
 };
 
@@ -755,6 +780,17 @@ InkCanvas.prototype._drawEndCurve = function () {
     var curve = this._caculateCurve(this.smoothGroup);
     if (curve) {
         this._calculateWidthAndDraw(curve);
+        var p = this.smoothGroup[this.smoothGroup.length - 1];
+        if (!curve.endPoint.equals(p)) {
+            p.pressure = 0;
+            this.smoothGroup.push(p);
+            this._drawEndCurve();
+        }
+        //this._ctx.fillText(curve.endPoint.x + ',' + curve.endPoint.y, curve.endPoint.x + 2, curve.endPoint.y + 2);
+        //this._ctx.stroke();
+        //console.info(curve.endPoint.x + "," + curve.endPoint.y);
+    } else {
+        console.info('null');
     }
 };
 
@@ -803,6 +839,17 @@ InkCanvas.prototype._drawDot = function (point) {
     this._drawPoint(point.x, point.y, width);
     ctx.closePath();
     ctx.fill();
+};
+
+InkCanvas.prototype._drawRing = function (point) {
+    var ctx = this._ctx;
+    var old = ctx.fillStyle;
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = old;
 };
 
 InkCanvas.prototype._fromData = function (pointGroups, drawCurve, drawDot) {
