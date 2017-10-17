@@ -43,6 +43,43 @@ Point.prototype.equals = function (other) {
 
 Point.prototype.radiu = function () {};
 
+Point.prototype.isInArea = function (area) {
+    var pi2 = Math.PI * 2;
+    var angls = [];
+    for (var bi = 0; bi < area.length; ++bi) {
+        var p1 = area[bi];
+        var dx1 = p1.x - this.x;
+        var dy1 = p1.y - this.y;
+        var ag = Math.atan2(dy1, dx1);
+        if (ag < 0) {
+            angls.push(pi2 + ag);
+        } else {
+            angls.push(ag);
+        }
+    }
+    var angle = 0;
+    for (var ai = 0; ai < angls.length; ++ai) {
+        var a0 = angls[ai];
+        var idx = ai + 1;
+        if (idx >= angls.length) {
+            idx = 0;
+        }
+        var a1 = angls[idx];
+        var diff = a1 - a0;
+        if (ai + 1 >= angls.length && diff < -Math.PI) {
+            diff = 2 * Math.PI + diff;
+        }
+        angle += diff;
+    }
+    //console.info(': '+angle);
+    if (Math.abs(angle) < 0.01) {
+        //point is in area
+        //console.info('=== ' + angle+" == " + angls.length);
+        return true;
+    }
+    return false;
+};
+
 function Bezier(startPoint, control1, control2, endPoint) {
   this.startPoint = startPoint;
   this.control1 = control1;
@@ -150,6 +187,15 @@ function BBox(p1, p2) {
     }
 }
 
+BBox.prototype.clear = function () {
+    this.p1 = null;
+    this.p2 = null;
+    this.top = null;
+    this.bottom = null;
+    this.left = null;
+    this.right = null;
+};
+
 BBox.prototype.isInBound = function (x, y) {
     if (x >= this.left && x <= this.right && y >= this.top && y <= this.bottom) return true;
     return false;
@@ -181,6 +227,21 @@ BBox.prototype.isIntersect = function (box) {
         return true;
     }
     return false;
+};
+
+BBox.prototype.merge = function (box) {
+    if (this.left == null) {
+        this.p1 = box.p1;
+        this.p2 = box.p2;
+        this.left = box.left;
+        this.right = box.right;
+        this.top = box.top;
+        this.bottom = box.bottom;
+    }
+    this.top = Math.min(this.top, box.top);
+    this.bottom = Math.max(this.bottom, box.bottom);
+    this.left = Math.min(this.left, box.left);
+    this.right = Math.max(this.right, box.right);
 };
 
 function Stabilizer(points, radiu) {}
@@ -298,20 +359,24 @@ Curve.drawPoint = function (context, x, y, size) {
     context.arc(x, y, size, 0, 2 * Math.PI, false);
 };
 
-Curve.prototype.appendPoint = function (point) {
-    if (this.data.length == 0) {
-        this.bbox.left = point.x;
-        this.bbox.right = point.x;
-        this.bbox.top = point.y;
-        this.bbox.bottom = point.y;
+Curve.appendPoint = function (data, bbox, point) {
+    if (bbox.left == null) {
+        bbox.left = point.x;
+        bbox.right = point.x;
+        bbox.top = point.y;
+        bbox.bottom = point.y;
     }
-    this.data.push(point);
+    data.push(point);
     var x = point.x;
     var y = point.y;
-    this.bbox.right = Math.max(this.bbox.right, x, this.bbox.left);
-    this.bbox.left = Math.min(this.bbox.right, x, this.bbox.left);
-    this.bbox.top = Math.min(this.bbox.top, y, this.bbox.bottom);
-    this.bbox.bottom = Math.max(this.bbox.top, y, this.bbox.bottom);
+    bbox.right = Math.max(bbox.right, x, bbox.left);
+    bbox.left = Math.min(bbox.right, x, bbox.left);
+    bbox.top = Math.min(bbox.top, y, bbox.bottom);
+    bbox.bottom = Math.max(bbox.top, y, bbox.bottom);
+};
+
+Curve.prototype.addPoint = function (point) {
+    Curve.appendPoint(this.data, this.bbox, point);
     this.length += 1;
 };
 
@@ -402,7 +467,8 @@ function InkCanvas(canvas, options) {
     this.onEnd = opts.onEnd;
 
     this._lastPoint = null; //captured point in last time
-    this._selectIds = [];
+    this._selectCurves = [];
+    this._bbox = new BBox(null, null); //selection's bbox
     this._canvas = canvas;
     this._ctx = canvas.getContext('2d');
     this.clear();
@@ -412,6 +478,10 @@ function InkCanvas(canvas, options) {
     this._handlePointerDown = function (event) {
         if (event.which == 1) {
             self._mouseButtonDown = true;
+            if (self.state === 'select') {
+                self.smoothGroup = []; //use group to 
+                self._bbox.clear();
+            }
             self._strokeBegin(event);
         } else if (event.which == 6) {//pen cap
         }
@@ -428,6 +498,7 @@ function InkCanvas(canvas, options) {
             self._mouseButtonDown = false;
             self._strokeEnd(event);
             if (self.state === 'select') {
+                //drawBox(self._ctx, self._bbox);
                 self.redraw();
             }
         }
@@ -585,6 +656,7 @@ InkCanvas.prototype.hitTest = function (pt) {
 InkCanvas.prototype.redraw = function () {
     this._clearBackground();
     this.drawCurves(this._data);
+    drawBox(this._ctx, this._bbox);
 };
 
 InkCanvas.prototype.drawCurve = function (curve) {
@@ -634,9 +706,11 @@ InkCanvas.prototype._strokeUpdate = function (event) {
             }
             break;
         case 'select':
-            if (this._selectIds.length == 0) {
-                console.info('ddd');
+            if (this._selectCurves.length == 0) {
                 this._drawRing(point);
+                var grp = this.smoothGroup;
+                if (grp.length && grp[grp.length - 1].equals(point)) break;
+                Curve.appendPoint(this.smoothGroup, this._bbox, point);
             } else {}
             break;
         default:
@@ -648,19 +722,57 @@ InkCanvas.prototype._strokeUpdate = function (event) {
 };
 
 InkCanvas.prototype._strokeEnd = function (event) {
-    if (this.state == 'pen') {
-        var canDrawCurve = this.points.length > 2;
-        var point = this.points[0]; // Point instance
+    switch (this.state) {
+        case 'pen':
+            var canDrawCurve = this.points.length > 2;
+            var point = this.points[0]; // Point instance
 
-        if (!canDrawCurve && point) {
-            this._drawDot(point);
-        }
-        var curPoint = this._event2Point(event);
-        curPoint.pressure = 0.005;
-        this._drawAddedPoint(curPoint);
-        this._drawLastPoints();
+            if (!canDrawCurve && point) {
+                this._drawDot(point);
+            }
+            var curPoint = this._event2Point(event);
+            curPoint.pressure = 0.005;
+            this._drawAddedPoint(curPoint);
+            this._drawLastPoints();
+            break;
+        case 'select':
+            var curves = this._data;
+            var contains = [];
+            for (var i = 0; i < curves.length; ++i) {
+                var curve = curves[i];
+                if (this._bbox.isIntersect(curve.bbox)) {
+                    //check how many points in selected range
+                    var validCurve = [];
+                    for (var idx = 0; idx < curve.length; ++idx) {
+                        var pt = curve._smoothData[idx];
+                        if (this._bbox.isInBound(pt.x, pt.y)) {
+                            validCurve.push(pt);
+                        }
+                    }
+                    if (validCurve.length > 0) {
+                        contains.push({ curve: curve, points: validCurve });
+                    }
+                }
+            }
+
+            var selBox = new BBox(null, null);
+            for (var pos = 0; pos < contains.length; ++pos) {
+                for (var _i2 = 0; _i2 < contains[pos].points.length; ++_i2) {
+                    var _pt = contains[pos].points[_i2];
+                    if (_pt.isInArea(this.smoothGroup)) {
+                        //point is selected
+                        drawBox(this._ctx, new BBox(new Point(_pt.x - 2, _pt.y - 2), new Point(_pt.x + 2, _pt.y + 2)));
+                        selBox.merge(contains[pos].curve.bbox);
+                        break;
+                    }
+                }
+            }
+            this._bbox = selBox;
+            //drawBox(this._ctx, selBox);
+            break;
+        default:
+            break;
     }
-
     if (typeof this.onEnd === 'function') {
         this.onEnd(event);
     }
@@ -691,8 +803,8 @@ InkCanvas.prototype._smoothTo = function (point) {
         if (len < 2) {
             this._addSmoothPoint(points[len - 1]);
         } else if (len > 2) {
-            var _pt = Stabilizer.smooth(points, len - 3, 3);
-            this._addSmoothPoint(_pt);
+            var _pt2 = Stabilizer.smooth(points, len - 3, 3);
+            this._addSmoothPoint(_pt2);
             this._addSmoothPoint(points[len - 1]);
         }
         return;
@@ -707,7 +819,7 @@ InkCanvas.prototype._smoothTo = function (point) {
             return;
         }
     }
-    lastCurve.appendPoint(point);
+    lastCurve.addPoint(point);
     points.push(point);
     if (len < 2) {
         if (this.smoothGroup.length == 0) {
@@ -746,6 +858,24 @@ InkCanvas.prototype._calculateWidthAndDraw = function (curve) {
         console.info('width');
     }
 };
+//function print(data) {
+//    for (let i = 0; i < data.length; ++i) {
+//        const pt = data[i];
+//        console.info(i + ': (' + pt.x + ',' + pt.y + ')');
+//    }
+//}
+function drawBox(context, bbox) {
+    if (bbox.left == null) return;
+    context.strokeStyle = 'red';
+    context.beginPath();
+    context.moveTo(bbox.left, bbox.top);
+    context.lineTo(bbox.right, bbox.top);
+    context.lineTo(bbox.right, bbox.bottom);
+    context.lineTo(bbox.left, bbox.bottom);
+    context.lineTo(bbox.left, bbox.top);
+    context.stroke();
+    context.closePath();
+}
 InkCanvas.prototype._drawLastPoints = function () {
     var curve = this._addPoint();
     if (curve) {
@@ -782,7 +912,7 @@ InkCanvas.prototype._drawEndCurve = function () {
         this._calculateWidthAndDraw(curve);
         var p = this.smoothGroup[this.smoothGroup.length - 1];
         if (!curve.endPoint.equals(p)) {
-            p.pressure = 0;
+            p.pressure = 0.005;
             this.smoothGroup.push(p);
             this._drawEndCurve();
         }

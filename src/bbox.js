@@ -9,6 +9,15 @@
     }
 }
 
+BBox.prototype.clear = function () {
+    this.p1 = null;
+    this.p2 = null;
+    this.top = null;
+    this.bottom = null;
+    this.left = null;
+    this.right = null;
+}
+
 BBox.prototype.isInBound = function (x, y) {
     if (x >= this.left && x <= this.right && y >= this.top && y <= this.bottom) return true;
     return false;
@@ -40,6 +49,21 @@ BBox.prototype.isIntersect = function (box) {
         return true;
     }
     return false;
+}
+
+BBox.prototype.merge = function (box) {
+    if (this.left == null) {
+        this.p1 = box.p1;
+        this.p2 = box.p2;
+        this.left = box.left;
+        this.right = box.right;
+        this.top = box.top;
+        this.bottom = box.bottom;
+    }
+    this.top = Math.min(this.top, box.top);
+    this.bottom = Math.max(this.bottom, box.bottom);
+    this.left = Math.min(this.left, box.left);
+    this.right = Math.max(this.right, box.right);
 }
 
 export default BBox;

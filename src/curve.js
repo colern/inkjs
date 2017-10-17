@@ -99,20 +99,24 @@ Curve.drawPoint = function (context, x, y, size) {
     context.arc(x, y, size, 0, 2 * Math.PI, false);
 }
 
-Curve.prototype.appendPoint = function (point) {
-    if (this.data.length == 0) {
-        this.bbox.left = point.x;
-        this.bbox.right = point.x;
-        this.bbox.top = point.y;
-        this.bbox.bottom = point.y;
+Curve.appendPoint = function (data, bbox, point) {
+    if (bbox.left == null) {
+        bbox.left = point.x;
+        bbox.right = point.x;
+        bbox.top = point.y;
+        bbox.bottom = point.y;
     }
-    this.data.push(point);
-    const x=point.x;
+    data.push(point);
+    const x = point.x;
     const y = point.y;
-    this.bbox.right = Math.max(this.bbox.right, x, this.bbox.left);
-    this.bbox.left = Math.min(this.bbox.right, x, this.bbox.left);
-    this.bbox.top = Math.min(this.bbox.top, y, this.bbox.bottom);
-    this.bbox.bottom = Math.max(this.bbox.top, y, this.bbox.bottom);
+    bbox.right = Math.max(bbox.right, x, bbox.left);
+    bbox.left = Math.min(bbox.right, x, bbox.left);
+    bbox.top = Math.min(bbox.top, y, bbox.bottom);
+    bbox.bottom = Math.max(bbox.top, y, bbox.bottom);
+}
+
+Curve.prototype.addPoint = function (point) {
+    Curve.appendPoint(this.data, this.bbox, point);
     this.length += 1;
 };
 
