@@ -554,19 +554,11 @@ InkCanvas.prototype._addPoint = function (point) {
     return this._caculateCurve(this.smoothGroup);
 };
 
-InkCanvas.prototype._drawPoint = function (x, y, size) {
-    Curve.drawPoint(this._ctx, x, y, size);
-    this._isEmpty = false;
-};
-
 InkCanvas.prototype._drawDot = function (point) {
     const ctx = this._ctx;
     const width = (typeof this.dotSize) === 'function' ? this.dotSize() : this.dotSize;
-    
-    ctx.beginPath();
-    this._drawPoint(point.x, point.y, width);
-    ctx.closePath();
-    ctx.fill();
+    this._isEmpty = false;
+    Curve.drawDot(ctx, point.x, point.y, width);
 };
 
 InkCanvas.prototype._drawRing = function (point) {

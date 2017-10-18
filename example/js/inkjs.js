@@ -331,9 +331,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
     var widthDelta = endWidth - startWidth;
     var drawSteps = Math.floor(fragment.length());
     context.beginPath();
-    if (drawSteps == 0) {
-        console.info('000');
-    }
+    //if (drawSteps == 0) {
+    //    console.info('000');
+    //}
     for (var i = 0; i < drawSteps; i += 1) {
         // Calculate the Bezier (x, y) coordinate for this step.
         var t = i / drawSteps;
@@ -367,6 +367,13 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
 Curve.drawPoint = function (context, x, y, size) {
     context.moveTo(x, y);
     context.arc(x, y, size, 0, 2 * Math.PI, false);
+};
+
+Curve.drawDot = function (context, x, y, size) {
+    context.beginPath();
+    Curve.drawPoint(context, x, y, size);
+    context.closePath();
+    context.fill();
 };
 
 Curve.appendPoint = function (data, bbox, point) {
@@ -410,23 +417,15 @@ Curve.prototype.draw = function (context) {
     //draw first 3 points
     for (var st = 0; st < 4; ++st) {
         var arr = [];
-        if (st == 0) {
-            arr.push(this._smoothData[0]);
-        }
-        if (st == 1) {
-            arr.push(this._smoothData[0]);
-            arr.push(this._smoothData[1]);
-        }
-        if (st == 2) {
-            arr.push(this._smoothData[0]);
-            arr.push(this._smoothData[1]);
-            arr.push(this._smoothData[2]);
-        }
-        if (st == 3) {
-            arr.push(this._smoothData[st - 3]);
-            arr.push(this._smoothData[st - 2]);
-            arr.push(this._smoothData[st - 1]);
-            arr.push(this._smoothData[st]);
+        for (var i = 0; i <= st; ++i) {
+            var index = i;
+            if (st < 3) {
+                if (index >= this._smoothData.length) index = this._smoothData.length - 1;
+                arr.push(this._smoothData[index]);
+            } else {
+                if (index >= this._smoothData.length) index = this._smoothData.length - 1;
+                arr.push(this._smoothData[index]);
+            }
         }
         this._drawFrag(context, arr, 0);
     }
@@ -437,11 +436,15 @@ Curve.prototype.draw = function (context) {
 };
 
 Curve.prototype._drawFrag = function (context, data, pos) {
-    var frag = Curve.createFragment(data, pos);
-    if (frag) {
-        var widths = Curve.calculateFragmentWidths(frag, this.radiu);
-        if (widths) {
-            Curve.drawFragment(context, frag, widths.start, widths.end);
+    if (data.length < 2) {
+        Curve.drawDot(context, data[0].x, data[0].y, this.radiu);
+    } else {
+        var frag = Curve.createFragment(data, pos);
+        if (frag) {
+            var widths = Curve.calculateFragmentWidths(frag, this.radiu);
+            if (widths) {
+                Curve.drawFragment(context, frag, widths.start, widths.end);
+            }
         }
     }
 };
@@ -988,19 +991,11 @@ InkCanvas.prototype._addPoint = function (point) {
     return this._caculateCurve(this.smoothGroup);
 };
 
-InkCanvas.prototype._drawPoint = function (x, y, size) {
-    Curve.drawPoint(this._ctx, x, y, size);
-    this._isEmpty = false;
-};
-
 InkCanvas.prototype._drawDot = function (point) {
     var ctx = this._ctx;
     var width = typeof this.dotSize === 'function' ? this.dotSize() : this.dotSize;
-
-    ctx.beginPath();
-    this._drawPoint(point.x, point.y, width);
-    ctx.closePath();
-    ctx.fill();
+    this._isEmpty = false;
+    Curve.drawDot(ctx, point.x, point.y, width);
 };
 
 InkCanvas.prototype._drawRing = function (point) {

@@ -61,9 +61,9 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
     const widthDelta = endWidth - startWidth;
     const drawSteps = Math.floor(fragment.length());
     context.beginPath();
-    if (drawSteps == 0) {
-        console.info('000');
-    }
+    //if (drawSteps == 0) {
+    //    console.info('000');
+    //}
     for (let i = 0; i < drawSteps; i += 1) {
         // Calculate the Bezier (x, y) coordinate for this step.
         const t = i / drawSteps;
@@ -97,6 +97,13 @@ Curve.drawFragment = function (context, fragment, startWidth, endWidth) {
 Curve.drawPoint = function (context, x, y, size) {
     context.moveTo(x, y);
     context.arc(x, y, size, 0, 2 * Math.PI, false);
+}
+
+Curve.drawDot = function (context, x, y, size) {
+    context.beginPath();
+    Curve.drawPoint(context, x, y, size);
+    context.closePath();
+    context.fill();
 }
 
 Curve.appendPoint = function (data, bbox, point) {
@@ -140,23 +147,16 @@ Curve.prototype.draw = function (context) {
     //draw first 3 points
     for (let st = 0; st < 4; ++st) {
         let arr = [];
-        if (st == 0) {
-            arr.push(this._smoothData[0]);
-        }
-        if (st == 1) {
-            arr.push(this._smoothData[0]);
-            arr.push(this._smoothData[1]);
-        }
-        if (st == 2) {
-            arr.push(this._smoothData[0]);
-            arr.push(this._smoothData[1]);
-            arr.push(this._smoothData[2]);
-        }
-        if (st == 3) {
-            arr.push(this._smoothData[st - 3]);
-            arr.push(this._smoothData[st - 2]);
-            arr.push(this._smoothData[st - 1]);
-            arr.push(this._smoothData[st]);
+        for (let i = 0; i <= st; ++i) {
+                let index = i;
+                if (st < 3) {
+                if (index >= this._smoothData.length) index = this._smoothData.length-1;
+                arr.push(this._smoothData[index]);
+            }
+            else {
+                if (index >= this._smoothData.length) index = this._smoothData.length - 1;
+                arr.push(this._smoothData[index]);
+            }
         }
         this._drawFrag(context,arr, 0);
     }
@@ -166,12 +166,17 @@ Curve.prototype.draw = function (context) {
     context.fillStyle = fst;
 }
 
-Curve.prototype._drawFrag = function (context,data, pos) {
-    const frag = Curve.createFragment(data, pos);
-    if (frag) {
-        const widths = Curve.calculateFragmentWidths(frag, this.radiu);
-        if (widths) {
-            Curve.drawFragment(context, frag, widths.start, widths.end);
+Curve.prototype._drawFrag = function (context, data, pos) {
+    if (data.length < 2) {
+        Curve.drawDot(context, data[0].x, data[0].y, this.radiu);
+    }
+    else {
+        const frag = Curve.createFragment(data, pos);
+        if (frag) {
+            const widths = Curve.calculateFragmentWidths(frag, this.radiu);
+            if (widths) {
+                Curve.drawFragment(context, frag, widths.start, widths.end);
+            }
         }
     }
 }
