@@ -23,6 +23,16 @@ BBox.prototype.isInBound = function (x, y) {
     return false;
 }
 
+BBox.prototype.isOnVertical = function (x, y) {
+    if (Math.abs(x - this.left) <= 2 || Math.abs(x - this.right)<=2) return true;
+    return false;
+}
+
+BBox.prototype.isOnHorizon = function (x, y) {
+    if (Math.abs(y - this.top) <= 2 || Math.abs(y - this.bottom) <= 2) return true;
+    return false;
+}
+
 BBox.prototype.slopeWith = function (x, y) {
     const d = Math.abs(this.slope(x,y));
     //console.info(d);

@@ -5,6 +5,7 @@ InkJS is a JavaScript library supported ink canvas which like microsoft inkcanva
 If you use firefox, you could open `about:config` and set `dom.w3c_pointer_events.enabled` preference to `true`.
 So if you hope to use a light weight library or compatibility for older browser, I addvise you use signature_pad.
 
+![example](https://raw.githubusercontent.com/colern/inkjs/master/ink.jpg)
 ## Usage
 ### API
 ``` javascript

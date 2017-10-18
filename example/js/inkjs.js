@@ -201,6 +201,16 @@ BBox.prototype.isInBound = function (x, y) {
     return false;
 };
 
+BBox.prototype.isOnVertical = function (x, y) {
+    if (Math.abs(x - this.left) <= 2 || Math.abs(x - this.right) <= 2) return true;
+    return false;
+};
+
+BBox.prototype.isOnHorizon = function (x, y) {
+    if (Math.abs(y - this.top) <= 2 || Math.abs(y - this.bottom) <= 2) return true;
+    return false;
+};
+
 BBox.prototype.slopeWith = function (x, y) {
     var d = Math.abs(this.slope(x, y));
     //console.info(d);
@@ -453,8 +463,10 @@ function InkCanvas(canvas, options) {
 
     if (this.throttle) {
         this._strokeMoveUpdate = throttle(InkCanvas.prototype._strokeUpdate, this.throttle);
+        this._selectMoveUpdate = throttle(InkCanvas.prototype._mouseMove, this.throttle);
     } else {
         this._strokeMoveUpdate = InkCanvas.prototype._strokeUpdate;
+        this._selectMoveUpdate = InkCanvas.prototype._mouseMove;
     }
 
     this.dotSize = opts.dotSize || function () {
@@ -490,6 +502,8 @@ function InkCanvas(canvas, options) {
     this._handlePointerMove = function (event) {
         if (self._mouseButtonDown) {
             self._strokeMoveUpdate(event);
+        } else {
+            self._selectMoveUpdate(event);
         }
     };
 
@@ -689,38 +703,6 @@ InkCanvas.prototype._strokeBegin = function (event) {
     }
 };
 
-InkCanvas.prototype._strokeUpdate = function (event) {
-    var point = this._event2Point(event);
-    switch (this.state) {
-        case 'pen':
-            this._drawAddedPoint(point);
-            break;
-        case 'eraser':
-            //may be too fast to close the curve.
-            var hits = this.hitTest(point);
-            if (hits != null) {
-                for (var i = 0; i < hits.length; ++i) {
-                    hits[i].hide = true;
-                }
-                this.redraw();
-            }
-            break;
-        case 'select':
-            if (this._selectCurves.length == 0) {
-                this._drawRing(point);
-                var grp = this.smoothGroup;
-                if (grp.length && grp[grp.length - 1].equals(point)) break;
-                Curve.appendPoint(this.smoothGroup, this._bbox, point);
-            } else {}
-            break;
-        default:
-            if (this.hitTest(point)) {
-                //console.info('hit');
-            }
-            break;
-    }
-};
-
 InkCanvas.prototype._strokeEnd = function (event) {
     switch (this.state) {
         case 'pen':
@@ -761,7 +743,7 @@ InkCanvas.prototype._strokeEnd = function (event) {
                     var _pt = contains[pos].points[_i2];
                     if (_pt.isInArea(this.smoothGroup)) {
                         //point is selected
-                        drawBox(this._ctx, new BBox(new Point(_pt.x - 2, _pt.y - 2), new Point(_pt.x + 2, _pt.y + 2)));
+                        //drawBox(this._ctx, new BBox(new Point(pt.x - 2, pt.y - 2), new Point(pt.x + 2, pt.y + 2)));
                         selBox.merge(contains[pos].curve.bbox);
                         break;
                     }
@@ -775,6 +757,56 @@ InkCanvas.prototype._strokeEnd = function (event) {
     }
     if (typeof this.onEnd === 'function') {
         this.onEnd(event);
+    }
+};
+
+InkCanvas.prototype._strokeUpdate = function (event) {
+    var point = this._event2Point(event);
+    switch (this.state) {
+        case 'pen':
+            this._drawAddedPoint(point);
+            break;
+        case 'eraser':
+            //may be too fast to close the curve.
+            var hits = this.hitTest(point);
+            if (hits != null) {
+                for (var i = 0; i < hits.length; ++i) {
+                    hits[i].hide = true;
+                }
+                this.redraw();
+            }
+            break;
+        case 'select':
+            if (this._selectCurves.length == 0) {
+                this._drawRing(point);
+                var grp = this.smoothGroup;
+                if (grp.length && grp[grp.length - 1].equals(point)) break;
+                Curve.appendPoint(this.smoothGroup, this._bbox, point);
+            } else {}
+            break;
+        default:
+            if (this.hitTest(point)) {
+                //console.info('hit');
+            }
+            break;
+    }
+};
+
+InkCanvas.prototype._mouseMove = function (event) {
+    if (this.state === 'select') {
+        var point = this._event2Point(event);
+        var canvas = this._canvas;
+        if (this._bbox.isInBound(point.x, point.y)) {
+            if (this._bbox.isOnVertical(point.x, point.y)) {
+                canvas.style.cursor = 'e-resize';
+            } else if (this._bbox.isOnHorizon(point.x, point.y)) {
+                canvas.style.cursor = 'n-resize';
+            } else {
+                canvas.style.cursor = 'move';
+            }
+        } else {
+            canvas.style.cursor = 'auto';
+        }
     }
 };
 
@@ -866,7 +898,7 @@ InkCanvas.prototype._calculateWidthAndDraw = function (curve) {
 //}
 function drawBox(context, bbox) {
     if (bbox.left == null) return;
-    context.strokeStyle = 'red';
+    context.strokeStyle = 'gray';
     context.beginPath();
     context.moveTo(bbox.left, bbox.top);
     context.lineTo(bbox.right, bbox.top);

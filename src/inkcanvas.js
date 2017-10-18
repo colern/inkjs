@@ -22,8 +22,10 @@ function InkCanvas(canvas, options) {
     
     if (this.throttle) {
         this._strokeMoveUpdate = throttle(InkCanvas.prototype._strokeUpdate, this.throttle);
+        this._selectMoveUpdate = throttle(InkCanvas.prototype._mouseMove, this.throttle);
     } else {
         this._strokeMoveUpdate = InkCanvas.prototype._strokeUpdate;
+        this._selectMoveUpdate = InkCanvas.prototype._mouseMove;
     }
     
     this.dotSize = opts.dotSize || function () {
@@ -60,6 +62,9 @@ function InkCanvas(canvas, options) {
     this._handlePointerMove = function (event) {
         if (self._mouseButtonDown) {
             self._strokeMoveUpdate(event);
+        }
+        else {
+            self._selectMoveUpdate(event);
         }
     };
     
@@ -250,6 +255,62 @@ InkCanvas.prototype._strokeBegin = function (event) {
     }
 };
 
+InkCanvas.prototype._strokeEnd = function (event) {
+    switch (this.state) {
+        case 'pen':
+            const canDrawCurve = this.points.length > 2;
+            let point = this.points[0]; // Point instance
+
+            if (!canDrawCurve && point) {
+                this._drawDot(point);
+            }
+            const curPoint = this._event2Point(event);
+            curPoint.pressure = 0.005;
+            this._drawAddedPoint(curPoint);
+            this._drawLastPoints();
+            break;
+        case 'select':
+            const curves = this._data;
+            let contains = [];
+            for (let i = 0; i < curves.length; ++i) {
+                const curve = curves[i];
+                if (this._bbox.isIntersect(curve.bbox)) {
+                    //check how many points in selected range
+                    let validCurve = [];
+                    for (let idx = 0; idx < curve.length; ++idx) {
+                        const pt = curve._smoothData[idx];
+                        if (this._bbox.isInBound(pt.x, pt.y)) {
+                            validCurve.push(pt);
+                        }
+                    }
+                    if (validCurve.length > 0) {
+                        contains.push({ curve: curve, points: validCurve });
+                    }
+                }
+            }
+
+            let selBox = new BBox(null, null);
+            for (let pos = 0; pos < contains.length; ++pos) {
+                for (let i = 0; i < contains[pos].points.length; ++i) {
+                    const pt = contains[pos].points[i];
+                    if (pt.isInArea(this.smoothGroup)) {//point is selected
+                        //drawBox(this._ctx, new BBox(new Point(pt.x - 2, pt.y - 2), new Point(pt.x + 2, pt.y + 2)));
+                        selBox.merge(contains[pos].curve.bbox);
+                        break;
+                    }
+                }
+            }
+            this._bbox = selBox;
+            //drawBox(this._ctx, selBox);
+            break;
+        default:
+            break;
+    }
+    if (typeof this.onEnd === 'function') {
+        this.onEnd(event);
+    }
+};
+
 InkCanvas.prototype._strokeUpdate = function (event) {
     const point = this._event2Point(event);
     switch (this.state) {
@@ -285,61 +346,26 @@ InkCanvas.prototype._strokeUpdate = function (event) {
     }
 };
 
-InkCanvas.prototype._strokeEnd = function (event) {
-    switch (this.state) {
-        case 'pen':
-            const canDrawCurve = this.points.length > 2;
-            let point = this.points[0]; // Point instance
-
-            if (!canDrawCurve && point) {
-                this._drawDot(point);
+InkCanvas.prototype._mouseMove = function (event) {
+    if (this.state === 'select') {
+        const point = this._event2Point(event);
+        const canvas = this._canvas;
+        if (this._bbox.isInBound(point.x, point.y)) {
+            if (this._bbox.isOnVertical(point.x, point.y)) {
+                canvas.style.cursor = 'e-resize';
             }
-            const curPoint = this._event2Point(event);
-            curPoint.pressure = 0.005;
-            this._drawAddedPoint(curPoint);
-            this._drawLastPoints();
-            break;
-        case 'select':
-            const curves = this._data;
-            let contains = [];
-            for (let i = 0; i < curves.length; ++i) {
-                const curve = curves[i];
-                if (this._bbox.isIntersect(curve.bbox)) {
-                    //check how many points in selected range
-                    let validCurve = [];
-                    for (let idx = 0; idx < curve.length; ++idx) {
-                        const pt = curve._smoothData[idx];
-                        if (this._bbox.isInBound(pt.x, pt.y)) {
-                            validCurve.push(pt);
-                        }
-                    }
-                    if (validCurve.length > 0) {
-                        contains.push({ curve: curve, points:validCurve });
-                    }
-                }
+            else if (this._bbox.isOnHorizon(point.x, point.y)) {
+                canvas.style.cursor = 'n-resize';
             }
-            
-            let selBox = new BBox(null, null);
-            for (let pos = 0; pos < contains.length; ++pos) {
-                for (let i = 0; i < contains[pos].points.length; ++i) {
-                    const pt = contains[pos].points[i];
-                    if (pt.isInArea(this.smoothGroup)) {//point is selected
-                        drawBox(this._ctx, new BBox(new Point(pt.x - 2, pt.y - 2), new Point(pt.x + 2, pt.y + 2)));
-                        selBox.merge(contains[pos].curve.bbox);
-                        break;
-                    }
-                }
+            else {
+                canvas.style.cursor = 'move';
             }
-            this._bbox = selBox;
-            //drawBox(this._ctx, selBox);
-            break;
-        default:
-            break;
-    }    
-    if (typeof this.onEnd === 'function') {
-        this.onEnd(event);
+        }
+        else {
+            canvas.style.cursor = 'auto';
+        }
     }
-};
+}
 
 InkCanvas.prototype._clearBackground = function () {
     const ctx = this._ctx;
@@ -432,7 +458,7 @@ InkCanvas.prototype._calculateWidthAndDraw = function (curve) {
 //}
 function drawBox(context, bbox) {
     if (bbox.left == null) return;
-    context.strokeStyle = 'red';
+    context.strokeStyle = 'gray';
     context.beginPath();
     context.moveTo(bbox.left, bbox.top);
     context.lineTo(bbox.right, bbox.top);
