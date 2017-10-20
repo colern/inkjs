@@ -39,6 +39,8 @@ function InkCanvas(canvas, options) {
     
     this._lastPoint = null; //captured point in last time
     this._selectCurves = [];
+    this._selectState = null; //current selected cursor: move,horizon,vertical
+    this._startMovePt = null; //this is the point which pressed first time before moving curves
     this._bbox = new BBox(null, null);  //selection's bbox
     this._canvas = canvas;
     this._ctx = canvas.getContext('2d');
@@ -51,7 +53,6 @@ function InkCanvas(canvas, options) {
             self._mouseButtonDown = true;
             if (self.state === 'select') {
                 self.smoothGroup = []; //use group to 
-                self._bbox.clear();
             }
             self._strokeBegin(event);
         }
@@ -248,6 +249,19 @@ InkCanvas.prototype._strokeBegin = function (event) {
         this._data.push(curve);
         this._reset();
     }
+    if (this.state === 'select') {
+        const point = this._event2Point(event);
+        //check if point is in selection range
+        if (!this._bbox.isInBound(point.x, point.y)) {
+            this._bbox.clear();
+            this._selectCurves.length = 0;
+            this._startMovePt = null;
+        }
+        else {
+            this._startMovePt = point;
+            return;
+        }
+    }
     this._strokeUpdate(event);
     
     if (typeof this.onBegin === 'function') {
@@ -270,6 +284,11 @@ InkCanvas.prototype._strokeEnd = function (event) {
             this._drawLastPoints();
             break;
         case 'select':
+            if (this._selectState !== null) {
+                this._startMovePt = null;
+                console.info('end');
+                return;
+            }
             const curves = this._data;
             let contains = [];
             for (let i = 0; i < curves.length; ++i) {
@@ -295,13 +314,13 @@ InkCanvas.prototype._strokeEnd = function (event) {
                     const pt = contains[pos].points[i];
                     if (pt.isInArea(this.smoothGroup)) {//point is selected
                         //drawBox(this._ctx, new BBox(new Point(pt.x - 2, pt.y - 2), new Point(pt.x + 2, pt.y + 2)));
+                        this._selectCurves.push(contains[pos].curve);
                         selBox.merge(contains[pos].curve.bbox);
                         break;
                     }
                 }
             }
             this._bbox = selBox;
-            //drawBox(this._ctx, selBox);
             break;
         default:
             break;
@@ -335,7 +354,32 @@ InkCanvas.prototype._strokeUpdate = function (event) {
                 Curve.appendPoint(this.smoothGroup, this._bbox, point);
             }
             else {
-
+                if (this._startMovePt === null) return;
+                const dx = point.x - this._startMovePt.x;
+                const dy = point.y - this._startMovePt.y;
+                if (dx === 0 && dy === 0) return;
+                this._startMovePt = point;
+                switch (this._selectState) {
+                    case 'move':
+                        const len = this._selectCurves.length;
+                        for (let i = 0; i < len; ++i) {
+                            const curve = this._selectCurves[i];
+                            const smoothC = curve._smoothData;
+                            for (let pos = 0; pos < smoothC.length; ++pos) {
+                                smoothC[pos].x += dx;
+                                smoothC[pos].y += dy;
+                            }
+                            const box = curve.bbox;
+                            box.left += dx, box.right += dx;
+                            box.top += dy, box.bottom += dy;
+                        }
+                        this._bbox.left += dx, this._bbox.right += dx;
+                        this._bbox.top += dy, this._bbox.bottom += dy;
+                        break;
+                    default:
+                        break;
+                }
+                this.redraw();
             }
             break;
         default:
@@ -346,23 +390,43 @@ InkCanvas.prototype._strokeUpdate = function (event) {
     }
 };
 
+InkCanvas.prototype._setSelectState = function (state) {
+    if (this._selectState !== state) {
+        this._selectState = state;
+        const canvas = this._canvas;
+        switch (state) {
+            case 'move':
+                canvas.style.cursor = 'move';
+                break;
+            case 'h':
+                canvas.style.cursor = 'n-resize';
+                break;
+            case 'v':
+                canvas.style.cursor = 'e-resize';
+                break;
+            default:
+                canvas.style.cursor = 'auto';
+                break;
+        }
+    }
+}
 InkCanvas.prototype._mouseMove = function (event) {
-    if (this.state === 'select') {
+    if (this.state === 'select'&&this._mouseButtonDown===false) {
         const point = this._event2Point(event);
         const canvas = this._canvas;
         if (this._bbox.isInBound(point.x, point.y)) {
             if (this._bbox.isOnVertical(point.x, point.y)) {
-                canvas.style.cursor = 'e-resize';
+                this._setSelectState('v');
             }
             else if (this._bbox.isOnHorizon(point.x, point.y)) {
-                canvas.style.cursor = 'n-resize';
+                this._setSelectState('h');
             }
             else {
-                canvas.style.cursor = 'move';
+                this._setSelectState('move');
             }
         }
         else {
-            canvas.style.cursor = 'auto';
+            this._setSelectState(null);
         }
     }
 }
@@ -523,6 +587,8 @@ InkCanvas.prototype._reset = function () {
     this._lastPoint = null;
     this._lastVelocity = 0;
     this._lastWidth = this.radiu;
+    this._bbox.clear();
+    this._startMovePt = null;
     this._ctx.fillStyle = this.penColor;
 };
 
